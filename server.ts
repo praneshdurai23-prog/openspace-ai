@@ -11,6 +11,28 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+// Normalize URL paths for both standalone and Vercel serverless environments
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  // If request was rewritten to /api/index or /api/index.js, restore the original requested path
+  const original = req.originalUrl || (req.headers['x-matched-path'] as string);
+  if (original && original.startsWith('/api') && (req.url === '/api/index' || req.url === '/api/index.js' || req.url === '/index.js' || req.url === '/index')) {
+    req.url = original;
+  } else if (req.url && !req.url.startsWith('/api')) {
+    req.url = `/api${req.url.startsWith('/') ? '' : '/'}${req.url}`;
+  }
+  next();
+});
+
+// Root API discovery endpoint
+app.get('/api', (_req: Request, res: Response) => {
+  res.json({
+    status: 'ok',
+    name: 'OpenSpace AI API',
+    version: '1.0.0',
+    timestamp: Date.now(),
+  });
+});
+
 // Body parsers with generous limits for inline file attachments (up to 25MB)
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
@@ -797,6 +819,11 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
 // VITE / STATIC SERVING
 // ----------------------------------------------------
 
+// Ensure unhandled /api/* routes always return JSON 404, NEVER HTML
+app.all('/api/*', (_req: Request, res: Response) => {
+  res.status(404).json({ error: 'API endpoint not found' });
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
@@ -818,4 +845,17 @@ async function startServer() {
   });
 }
 
-startServer();
+// Only start standalone HTTP server when not running in a serverless environment
+const isServerless = Boolean(
+  process.env.VERCEL ||
+  process.env.VERCEL_ENV ||
+  process.env.NOW_REGION ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME
+);
+
+if (!isServerless) {
+  startServer();
+}
+
+export { app };
+export default app;

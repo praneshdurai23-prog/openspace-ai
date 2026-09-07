@@ -44,6 +44,132 @@ export function getAuthHeaders(): Record<string, string> {
 }
 
 // ----------------------------------------------------
+// SAFE RESPONSE PARSING & RESILIENT FETCH HELPERS
+// ----------------------------------------------------
+
+/**
+ * Robust JSON parser for HTTP fetch responses.
+ * Prevents "Unexpected token T, the page content is not valid JSON" or HTML syntax errors.
+ * Safely handles:
+ * 1. Plain text responses (e.g., "The page could not be found", "Too many requests")
+ * 2. HTML error pages (e.g. <!DOCTYPE html> 404/500/502/504 pages from Vercel or proxies)
+ * 3. Empty or non-JSON payloads
+ * 4. Structured JSON error bodies
+ */
+export async function safeParseResponse<T = any>(
+  res: Response,
+  fallbackErrorMessage = 'Request failed'
+): Promise<T> {
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+
+  let rawText = '';
+  try {
+    rawText = await res.text();
+  } catch {
+    if (!res.ok) {
+      throw new Error(`${fallbackErrorMessage} (HTTP ${res.status})`);
+    }
+    return {} as T;
+  }
+
+  const trimmed = rawText.trim();
+
+  // Determine if content is valid JSON without throwing unhandled syntax errors
+  let parsed: any = null;
+  let isJsonValid = false;
+
+  if (trimmed) {
+    const looksLikeJson =
+      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+      (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
+      contentType.includes('application/json') ||
+      contentType.includes('+json');
+
+    if (looksLikeJson) {
+      try {
+        parsed = JSON.parse(trimmed);
+        isJsonValid = true;
+      } catch {
+        parsed = null;
+        isJsonValid = false;
+      }
+    }
+  }
+
+  // Handle non-2xx HTTP status codes
+  if (!res.ok) {
+    if (isJsonValid && parsed && typeof parsed === 'object') {
+      const errMsg = parsed.error || parsed.message || parsed.detail;
+      if (typeof errMsg === 'string' && errMsg.trim()) {
+        throw new Error(errMsg.trim());
+      }
+    }
+
+    // Response is HTML or plain text error page (e.g., Vercel 404 or proxy error)
+    if (
+      trimmed.startsWith('<') ||
+      trimmed.toLowerCase().includes('<!doctype') ||
+      trimmed.toLowerCase().includes('<html')
+    ) {
+      if (res.status === 404) {
+        throw new Error('API endpoint not found (HTTP 404). Please ensure the backend is running.');
+      }
+      if (res.status === 502 || res.status === 504) {
+        throw new Error('Backend service is temporarily unavailable. Please try again in a moment.');
+      }
+      throw new Error(`Server returned an error page (HTTP ${res.status}).`);
+    }
+
+    // Plain text single-line error message (like "The page could not be found" or rate limiter)
+    if (trimmed && trimmed.length < 150 && !trimmed.includes('\n')) {
+      throw new Error(`${trimmed} (HTTP ${res.status})`);
+    }
+
+    throw new Error(`${fallbackErrorMessage} (HTTP ${res.status})`);
+  }
+
+  // 2xx Success response
+  if (!trimmed) {
+    return {} as T;
+  }
+
+  if (!isJsonValid) {
+    // If server returned 200 OK with HTML (e.g., SPA rewrite matched an API route instead of an API handler)
+    if (
+      trimmed.startsWith('<') ||
+      trimmed.toLowerCase().includes('<!doctype') ||
+      trimmed.toLowerCase().includes('<html')
+    ) {
+      throw new Error('Received HTML response instead of JSON. The backend server or serverless route may not be responding.');
+    }
+    throw new Error(`Invalid response format from server: expected JSON but received "${trimmed.slice(0, 50)}..."`);
+  }
+
+  return parsed as T;
+}
+
+/**
+ * Resilient fetch wrapper with network error guarding and safe response parsing.
+ */
+export async function safeFetch<T = any>(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  fallbackErrorMessage = 'Request failed'
+): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(input, init);
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw err;
+    }
+    throw new Error('Unable to connect to the server. Please check your internet connection.');
+  }
+
+  return safeParseResponse<T>(res, fallbackErrorMessage);
+}
+
+// ----------------------------------------------------
 // AUTHENTICATION APIS
 // ----------------------------------------------------
 
@@ -52,13 +178,15 @@ export async function apiRegister(
   password: string,
   name: string
 ): Promise<{ user: UserProfile; token: string }> {
-  const res = await fetch('/api/auth/register', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, name }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Registration failed');
+  const data = await safeFetch<{ user: UserProfile; token: string }>(
+    '/api/auth/register',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, name }),
+    },
+    'Registration failed'
+  );
   setStoredAuthToken(data.token);
   return data;
 }
@@ -67,13 +195,15 @@ export async function apiLogin(
   email: string,
   password: string
 ): Promise<{ user: UserProfile; token: string }> {
-  const res = await fetch('/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Login failed');
+  const data = await safeFetch<{ user: UserProfile; token: string }>(
+    '/api/auth/login',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    },
+    'Login failed'
+  );
   setStoredAuthToken(data.token);
   return data;
 }
@@ -83,13 +213,15 @@ export async function apiGoogleLogin(
   name?: string,
   avatar?: string
 ): Promise<{ user: UserProfile; token: string; isNewUser: boolean }> {
-  const res = await fetch('/api/auth/google', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, name, avatar }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Google login failed');
+  const data = await safeFetch<{ user: UserProfile; token: string; isNewUser: boolean }>(
+    '/api/auth/google',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, name, avatar }),
+    },
+    'Google login failed'
+  );
   setStoredAuthToken(data.token);
   return data;
 }
@@ -111,62 +243,75 @@ export async function apiGetMe(): Promise<{ user: UserProfile; stats: UserStats 
   const token = getStoredAuthToken();
   if (!token) throw new Error('No authentication token found');
 
-  const res = await fetch('/api/auth/me', {
-    headers: { ...getAuthHeaders() },
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    setStoredAuthToken(null);
-    throw new Error(data.error || 'Session expired. Please log in again.');
+  try {
+    const data = await safeFetch<{ user: UserProfile; stats: UserStats }>(
+      '/api/auth/me',
+      {
+        headers: { ...getAuthHeaders() },
+      },
+      'Session expired. Please log in again.'
+    );
+    return data;
+  } catch (err: any) {
+    if (
+      err?.message?.includes('401') ||
+      err?.message?.includes('expired') ||
+      err?.message?.includes('Authentication required')
+    ) {
+      setStoredAuthToken(null);
+    }
+    throw err;
   }
-  return data;
 }
 
 export async function apiUpdateProfile(updates: {
   name?: string;
   avatar?: string;
 }): Promise<{ user: UserProfile }> {
-  const res = await fetch('/api/auth/profile', {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
+  return safeFetch<{ user: UserProfile }>(
+    '/api/auth/profile',
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(updates),
     },
-    body: JSON.stringify(updates),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to update profile');
-  return data;
+    'Failed to update profile'
+  );
 }
 
 export async function apiChangePassword(
   currentPassword: string,
   newPassword: string
 ): Promise<{ success: boolean; message: string }> {
-  const res = await fetch('/api/auth/change-password', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
+  return safeFetch<{ success: boolean; message: string }>(
+    '/api/auth/change-password',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ currentPassword, newPassword }),
     },
-    body: JSON.stringify({ currentPassword, newPassword }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to change password');
-  return data;
+    'Failed to change password'
+  );
 }
 
 export async function apiForgotPassword(
   email: string
 ): Promise<{ resetToken: string; message: string }> {
-  const res = await fetch('/api/auth/forgot-password', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to process request');
-  return data;
+  return safeFetch<{ resetToken: string; message: string }>(
+    '/api/auth/forgot-password',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    },
+    'Failed to process password reset request'
+  );
 }
 
 export async function apiResetPassword(
@@ -174,35 +319,46 @@ export async function apiResetPassword(
   token: string,
   newPassword: string
 ): Promise<{ success: boolean; message: string }> {
-  const res = await fetch('/api/auth/reset-password', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, token, newPassword }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to reset password');
-  return data;
+  return safeFetch<{ success: boolean; message: string }>(
+    '/api/auth/reset-password',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, token, newPassword }),
+    },
+    'Failed to reset password'
+  );
 }
 
 export async function apiExportUserData(): Promise<Blob> {
-  const res = await fetch('/api/auth/export-data', {
-    headers: { ...getAuthHeaders() },
-  });
-  if (!res.ok) throw new Error('Failed to export user data');
+  let res: Response;
+  try {
+    res = await fetch('/api/auth/export-data', {
+      headers: { ...getAuthHeaders() },
+    });
+  } catch {
+    throw new Error('Unable to connect to server to export user data.');
+  }
+
+  if (!res.ok) {
+    await safeParseResponse(res, 'Failed to export user data');
+  }
   return res.blob();
 }
 
 export async function apiDeleteAccount(password?: string): Promise<boolean> {
-  const res = await fetch('/api/auth/account', {
-    method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
+  await safeFetch<{ success: boolean }>(
+    '/api/auth/account',
+    {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ password }),
     },
-    body: JSON.stringify({ password }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to delete account');
+    'Failed to delete account'
+  );
   setStoredAuthToken(null);
   return true;
 }
@@ -216,18 +372,27 @@ export async function checkServerHealth(): Promise<{
   name: string;
   geminiConfigured: boolean;
 }> {
-  const res = await fetch('/api/health');
-  if (!res.ok) throw new Error('Failed to connect to backend server');
-  return res.json();
+  return safeFetch<{
+    status: string;
+    name: string;
+    geminiConfigured: boolean;
+  }>('/api/health', { method: 'GET' }, 'Failed to connect to backend server');
 }
 
 export async function fetchConversations(): Promise<Conversation[]> {
-  const res = await fetch('/api/conversations', {
-    headers: { ...getAuthHeaders() },
-  });
-  if (!res.ok) throw new Error('Failed to load conversations');
-  const data = await res.json();
-  return data.conversations || [];
+  try {
+    const data = await safeFetch<{ conversations: Conversation[] }>(
+      '/api/conversations',
+      {
+        headers: { ...getAuthHeaders() },
+      },
+      'Failed to load conversations'
+    );
+    return Array.isArray(data?.conversations) ? data.conversations : [];
+  } catch (err) {
+    console.warn('Could not load conversations from server:', err);
+    return [];
+  }
 }
 
 export async function createConversation(conv: {
@@ -236,132 +401,170 @@ export async function createConversation(conv: {
   mode: AIMode;
   messages?: ChatMessage[];
 }): Promise<Conversation> {
-  const res = await fetch('/api/conversations', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
+  const data = await safeFetch<{ conversation: Conversation }>(
+    '/api/conversations',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(conv),
     },
-    body: JSON.stringify(conv),
-  });
-  if (!res.ok) throw new Error('Failed to create conversation');
-  const data = await res.json();
+    'Failed to create conversation'
+  );
   return data.conversation;
 }
 
 export async function fetchConversation(id: string): Promise<Conversation | null> {
-  const res = await fetch(`/api/conversations/${encodeURIComponent(id)}`, {
-    headers: { ...getAuthHeaders() },
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error('Failed to load conversation');
-  const data = await res.json();
-  return data.conversation;
+  try {
+    const res = await fetch(`/api/conversations/${encodeURIComponent(id)}`, {
+      headers: { ...getAuthHeaders() },
+    });
+    if (res.status === 404) return null;
+    const data = await safeParseResponse<{ conversation: Conversation }>(
+      res,
+      'Failed to load conversation'
+    );
+    return data?.conversation || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function updateConversation(
   id: string,
   updates: Partial<Conversation>
 ): Promise<Conversation> {
-  const res = await fetch(`/api/conversations/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
+  const data = await safeFetch<{ conversation: Conversation }>(
+    `/api/conversations/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(updates),
     },
-    body: JSON.stringify(updates),
-  });
-  if (!res.ok) throw new Error('Failed to update conversation');
-  const data = await res.json();
+    'Failed to update conversation'
+  );
   return data.conversation;
 }
 
 export async function deleteConversation(id: string): Promise<boolean> {
-  const res = await fetch(`/api/conversations/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-    headers: { ...getAuthHeaders() },
-  });
-  if (!res.ok) throw new Error('Failed to delete conversation');
+  await safeFetch<{ success: boolean }>(
+    `/api/conversations/${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+      headers: { ...getAuthHeaders() },
+    },
+    'Failed to delete conversation'
+  );
   return true;
 }
 
 export async function clearAllConversations(): Promise<boolean> {
-  const res = await fetch('/api/conversations', {
-    method: 'DELETE',
-    headers: { ...getAuthHeaders() },
-  });
-  if (!res.ok) throw new Error('Failed to clear conversations');
+  await safeFetch<{ success: boolean }>(
+    '/api/conversations',
+    {
+      method: 'DELETE',
+      headers: { ...getAuthHeaders() },
+    },
+    'Failed to clear conversations'
+  );
   return true;
 }
 
 // Projects API
 export async function fetchProjects(): Promise<Project[]> {
-  const res = await fetch('/api/projects', {
-    headers: { ...getAuthHeaders() },
-  });
-  if (!res.ok) throw new Error('Failed to load projects');
-  const data = await res.json();
-  return data.projects || [];
+  try {
+    const data = await safeFetch<{ projects: Project[] }>(
+      '/api/projects',
+      {
+        headers: { ...getAuthHeaders() },
+      },
+      'Failed to load projects'
+    );
+    return Array.isArray(data?.projects) ? data.projects : [];
+  } catch (err) {
+    console.warn('Could not load projects from server:', err);
+    return [];
+  }
 }
 
 export async function createProject(project: Partial<Project>): Promise<Project> {
-  const res = await fetch('/api/projects', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
+  const data = await safeFetch<{ project: Project }>(
+    '/api/projects',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(project),
     },
-    body: JSON.stringify(project),
-  });
-  if (!res.ok) throw new Error('Failed to create project');
-  const data = await res.json();
+    'Failed to create project'
+  );
   return data.project;
 }
 
 export async function updateProject(id: string, updates: Partial<Project>): Promise<Project> {
-  const res = await fetch(`/api/projects/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
+  const data = await safeFetch<{ project: Project }>(
+    `/api/projects/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(updates),
     },
-    body: JSON.stringify(updates),
-  });
-  if (!res.ok) throw new Error('Failed to update project');
-  const data = await res.json();
+    'Failed to update project'
+  );
   return data.project;
 }
 
 export async function deleteProject(id: string): Promise<boolean> {
-  const res = await fetch(`/api/projects/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-    headers: { ...getAuthHeaders() },
-  });
-  if (!res.ok) throw new Error('Failed to delete project');
+  await safeFetch<{ success: boolean }>(
+    `/api/projects/${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+      headers: { ...getAuthHeaders() },
+    },
+    'Failed to delete project'
+  );
   return true;
 }
 
 // Settings API
 export async function fetchSettings(): Promise<Partial<UserSettings>> {
-  const res = await fetch('/api/settings', {
-    headers: { ...getAuthHeaders() },
-  });
-  if (!res.ok) throw new Error('Failed to load settings');
-  const data = await res.json();
-  return data.settings || {};
+  try {
+    const data = await safeFetch<{ settings: Partial<UserSettings> }>(
+      '/api/settings',
+      {
+        headers: { ...getAuthHeaders() },
+      },
+      'Failed to load settings'
+    );
+    return data?.settings || {};
+  } catch {
+    return {};
+  }
 }
 
 export async function saveSettings(settings: Partial<UserSettings>): Promise<UserSettings> {
-  const res = await fetch('/api/settings', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
+  const data = await safeFetch<{ settings: UserSettings }>(
+    '/api/settings',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(settings),
     },
-    body: JSON.stringify(settings),
-  });
-  if (!res.ok) throw new Error('Failed to save settings');
-  const data = await res.json();
+    'Failed to save settings'
+  );
   return data.settings;
 }
 
@@ -379,46 +582,60 @@ export async function uploadFile(
     dataUrl?: string;
   }
 ): Promise<FileAttachment> {
-  const res = await fetch('/api/upload', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
+  const data = await safeFetch<{ file: FileAttachment }>(
+    '/api/upload',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ conversationId, file }),
     },
-    body: JSON.stringify({ conversationId, file }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Upload failed' }));
-    throw new Error(err.error || 'Upload failed');
-  }
-  const data = await res.json();
+    'Upload failed'
+  );
   return data.file;
 }
 
 export async function fetchConversationFiles(conversationId: string): Promise<FileAttachment[]> {
-  const res = await fetch(`/api/conversations/${encodeURIComponent(conversationId)}/files`, {
-    headers: { ...getAuthHeaders() },
-  });
-  if (!res.ok) throw new Error('Failed to fetch conversation files');
-  const data = await res.json();
-  return data.files || [];
+  try {
+    const data = await safeFetch<{ files: FileAttachment[] }>(
+      `/api/conversations/${encodeURIComponent(conversationId)}/files`,
+      {
+        headers: { ...getAuthHeaders() },
+      },
+      'Failed to fetch conversation files'
+    );
+    return Array.isArray(data?.files) ? data.files : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchAllFiles(): Promise<FileAttachment[]> {
-  const res = await fetch('/api/files', {
-    headers: { ...getAuthHeaders() },
-  });
-  if (!res.ok) throw new Error('Failed to fetch files');
-  const data = await res.json();
-  return data.files || [];
+  try {
+    const data = await safeFetch<{ files: FileAttachment[] }>(
+      '/api/files',
+      {
+        headers: { ...getAuthHeaders() },
+      },
+      'Failed to fetch files'
+    );
+    return Array.isArray(data?.files) ? data.files : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function deleteStoredFile(fileId: string): Promise<boolean> {
-  const res = await fetch(`/api/files/${encodeURIComponent(fileId)}`, {
-    method: 'DELETE',
-    headers: { ...getAuthHeaders() },
-  });
-  if (!res.ok) throw new Error('Failed to delete file');
+  await safeFetch<{ success: boolean }>(
+    `/api/files/${encodeURIComponent(fileId)}`,
+    {
+      method: 'DELETE',
+      headers: { ...getAuthHeaders() },
+    },
+    'Failed to delete file'
+  );
   return true;
 }
 
@@ -428,60 +645,80 @@ export async function submitMessageFeedback(
   messageId: string,
   feedback: 'like' | 'dislike' | null
 ): Promise<boolean> {
-  const res = await fetch(`/api/messages/${encodeURIComponent(messageId)}/feedback`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-    },
-    body: JSON.stringify({ conversationId, feedback }),
-  });
-  if (!res.ok) return false;
-  const data = await res.json();
-  return data.success;
+  try {
+    const data = await safeFetch<{ success: boolean }>(
+      `/api/messages/${encodeURIComponent(messageId)}/feedback`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ conversationId, feedback }),
+      },
+      'Failed to submit feedback'
+    );
+    return Boolean(data?.success);
+  } catch {
+    return false;
+  }
 }
 
 export const saveMessageFeedback = submitMessageFeedback;
 
 // Smart Memory API
 export async function fetchMemories(): Promise<SmartMemory[]> {
-  const res = await fetch('/api/memories', {
-    headers: { ...getAuthHeaders() },
-  });
-  if (!res.ok) throw new Error('Failed to load memories');
-  const data = await res.json();
-  return data.memories || [];
+  try {
+    const data = await safeFetch<{ memories: SmartMemory[] }>(
+      '/api/memories',
+      {
+        headers: { ...getAuthHeaders() },
+      },
+      'Failed to load memories'
+    );
+    return Array.isArray(data?.memories) ? data.memories : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function addMemory(content: string, category?: string): Promise<SmartMemory> {
-  const res = await fetch('/api/memories', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
+  const data = await safeFetch<{ memory: SmartMemory }>(
+    '/api/memories',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ content, category }),
     },
-    body: JSON.stringify({ content, category }),
-  });
-  if (!res.ok) throw new Error('Failed to save memory');
-  const data = await res.json();
+    'Failed to save memory'
+  );
   return data.memory;
 }
 
 export async function deleteMemory(id: string): Promise<boolean> {
-  const res = await fetch(`/api/memories/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-    headers: { ...getAuthHeaders() },
-  });
-  if (!res.ok) throw new Error('Failed to delete memory');
+  await safeFetch<{ success: boolean }>(
+    `/api/memories/${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+      headers: { ...getAuthHeaders() },
+    },
+    'Failed to delete memory'
+  );
   return true;
 }
 
 export async function clearAllMemories(): Promise<boolean> {
-  const res = await fetch('/api/memories/clear', {
-    method: 'POST',
-    headers: { ...getAuthHeaders() },
-  });
-  if (!res.ok) throw new Error('Failed to clear memories');
+  await safeFetch<{ success: boolean }>(
+    '/api/memories/clear',
+    {
+      method: 'POST',
+      headers: { ...getAuthHeaders() },
+    },
+    'Failed to clear memories'
+  );
   return true;
 }
 
@@ -491,17 +728,21 @@ export async function shareConversation(conversationId: string): Promise<{
   title: string;
   shareUrl: string;
 }> {
-  const res = await fetch('/api/share', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
+  const data = await safeFetch<{
+    sharedChat: { id: string; title: string };
+  }>(
+    '/api/share',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ conversationId }),
     },
-    body: JSON.stringify({ conversationId }),
-  });
-  if (!res.ok) throw new Error('Failed to generate share link');
-  const data = await res.json();
-  const origin = window.location.origin;
+    'Failed to generate share link'
+  );
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
   return {
     id: data.sharedChat.id,
     title: data.sharedChat.title,
@@ -512,10 +753,17 @@ export async function shareConversation(conversationId: string): Promise<{
 export const createSharedChat = shareConversation;
 
 export async function fetchSharedChat(id: string): Promise<Conversation | null> {
-  const res = await fetch(`/api/share/${encodeURIComponent(id)}`);
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.sharedChat;
+  try {
+    const res = await fetch(`/api/share/${encodeURIComponent(id)}`);
+    if (!res.ok) return null;
+    const data = await safeParseResponse<{ sharedChat: Conversation }>(
+      res,
+      'Failed to load shared chat'
+    );
+    return data?.sharedChat || null;
+  } catch {
+    return null;
+  }
 }
 
 // AI Canvas Action
@@ -525,20 +773,19 @@ export async function executeCanvasAction(params: {
   customPrompt?: string;
   tone?: string;
 }): Promise<string> {
-  const res = await fetch('/api/ai/canvas', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
+  const data = await safeFetch<{ result: string }>(
+    '/api/ai/canvas',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(params),
     },
-    body: JSON.stringify(params),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || 'Failed to process canvas action');
-  }
-  const data = await res.json();
-  return data.result;
+    'Failed to process canvas action'
+  );
+  return data?.result || '';
 }
 
 // Streaming Chat API via SSE
@@ -576,37 +823,84 @@ export interface StreamChatParams {
 }
 
 export async function streamChat(params: StreamChatParams): Promise<void> {
-  const response = await fetch('/api/chat/stream', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-    },
-    body: JSON.stringify({
-      conversationId: params.conversationId,
-      messageId: params.messageId,
-      assistantMessageId: params.assistantMessageId,
-      mode: params.mode,
-      message: params.message,
-      history: params.history,
-      attachments: params.attachments,
-      webSearch: params.webSearch,
-      personalization: params.personalization,
-      difficulty: params.difficulty,
-      projectId: params.projectId,
-      simpleExplanationMode: params.simpleExplanationMode,
-    }),
-    signal: params.signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({
+        conversationId: params.conversationId,
+        messageId: params.messageId,
+        assistantMessageId: params.assistantMessageId,
+        mode: params.mode,
+        message: params.message,
+        history: params.history,
+        attachments: params.attachments,
+        webSearch: params.webSearch,
+        personalization: params.personalization,
+        difficulty: params.difficulty,
+        projectId: params.projectId,
+        simpleExplanationMode: params.simpleExplanationMode,
+      }),
+      signal: params.signal,
+    });
+  } catch (err: any) {
+    if (params.signal?.aborted) return;
+    params.onError(err?.message || 'Unable to connect to AI streaming service.');
+    return;
+  }
 
+  // Guard against non-2xx responses (e.g. 400, 404, 500, 502)
   if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error || `Server error: ${response.status}`);
+    let errMsg = `Server error: ${response.status}`;
+    try {
+      const raw = await response.text();
+      const trimmed = raw.trim();
+      if (trimmed) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (parsed?.error) errMsg = parsed.error;
+        } catch {
+          if (!trimmed.startsWith('<') && trimmed.length < 150) {
+            errMsg = trimmed;
+          }
+        }
+      }
+    } catch {}
+    params.onError(errMsg);
+    return;
+  }
+
+  // Verify that the server returned an SSE stream
+  const contentType = (response.headers.get('content-type') || '').toLowerCase();
+  if (!contentType.includes('text/event-stream')) {
+    try {
+      const rawText = (await response.text()).trim();
+      let errMsg = 'The server did not return a streaming response.';
+      if (rawText.startsWith('<') || rawText.toLowerCase().includes('<!doctype')) {
+        errMsg = 'The AI streaming service is currently unreachable (received HTML response).';
+      } else if (rawText.startsWith('{') && rawText.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(rawText);
+          if (parsed?.error) errMsg = parsed.error;
+        } catch {}
+      } else if (rawText.length < 150) {
+        errMsg = rawText;
+      }
+      params.onError(errMsg);
+    } catch {
+      params.onError('Unexpected response format from streaming endpoint.');
+    }
+    return;
   }
 
   const reader = response.body?.getReader();
   if (!reader) {
-    throw new Error('Response body is not readable');
+    params.onError('Streaming response body is not readable.');
+    return;
   }
 
   const decoder = new TextDecoder('utf-8');
@@ -633,6 +927,8 @@ export async function streamChat(params: StreamChatParams): Promise<void> {
 
         if (trimmed.startsWith('data:')) {
           const rawData = trimmed.slice(5).trim();
+          if (!rawData) continue;
+
           try {
             const data = JSON.parse(rawData);
             if (currentEvent === 'start') {
@@ -649,7 +945,7 @@ export async function streamChat(params: StreamChatParams): Promise<void> {
               params.onError(data.error);
             }
           } catch (parseErr) {
-            console.error('Failed to parse SSE data:', rawData, parseErr);
+            console.warn('Skipping unparseable SSE chunk:', rawData, parseErr);
           }
         }
       }

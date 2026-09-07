@@ -143,7 +143,7 @@ const DEFAULT_SETTINGS: StoredSettings = {
   simpleExplanationDefault: false,
 };
 
-const DB_DIR = path.join(process.cwd(), 'data');
+const DB_DIR = process.env.VERCEL ? path.join('/tmp', 'openspace-data') : path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DB_DIR, 'openspace-db.json');
 const LEGACY_DB_FILE = path.join(DB_DIR, 'myai-db.json');
 const GUEST_USER_ID = 'guest';
@@ -164,44 +164,55 @@ class Database {
 
   private init() {
     try {
-      if (!fs.existsSync(DB_DIR)) {
-        fs.mkdirSync(DB_DIR, { recursive: true });
+      let fileToLoad: string | null = null;
+      try {
+        if (!fs.existsSync(DB_DIR)) {
+          fs.mkdirSync(DB_DIR, { recursive: true });
+        }
+        fileToLoad = fs.existsSync(DB_FILE) ? DB_FILE : (fs.existsSync(LEGACY_DB_FILE) ? LEGACY_DB_FILE : null);
+      } catch (fsErr) {
+        console.warn('Database directory access warning (using in-memory fallback if needed):', fsErr);
       }
-
-      const fileToLoad = fs.existsSync(DB_FILE) ? DB_FILE : (fs.existsSync(LEGACY_DB_FILE) ? LEGACY_DB_FILE : null);
 
       if (fileToLoad) {
         const raw = fs.readFileSync(fileToLoad, 'utf-8');
-        const parsed = JSON.parse(raw);
-
-        // Migrate legacy flat structure to multi-tenant structure if needed
-        const userStores: Record<string, UserStore> = parsed.userStores || {};
-        if (!userStores[GUEST_USER_ID] && (parsed.conversations || parsed.projects || parsed.memories)) {
-          userStores[GUEST_USER_ID] = {
-            conversations: parsed.conversations || {},
-            files: parsed.files || {},
-            settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
-            projects: parsed.projects || {},
-            memories: parsed.memories || {},
-          };
+        let parsed: any = null;
+        try {
+          parsed = JSON.parse(raw);
+        } catch (parseErr) {
+          console.warn('Database file contained invalid JSON, starting fresh in-memory:', parseErr);
         }
 
-        this.data = {
-          users: parsed.users || {},
-          sessions: parsed.sessions || {},
-          userStores,
-          sharedChats: parsed.sharedChats || {},
-        };
+        if (parsed) {
+          // Migrate legacy flat structure to multi-tenant structure if needed
+          const userStores: Record<string, UserStore> = parsed.userStores || {};
+          if (!userStores[GUEST_USER_ID] && (parsed.conversations || parsed.projects || parsed.memories)) {
+            userStores[GUEST_USER_ID] = {
+              conversations: parsed.conversations || {},
+              files: parsed.files || {},
+              settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
+              projects: parsed.projects || {},
+              memories: parsed.memories || {},
+            };
+          }
 
-        // Sanitize any conversations with undefined or missing IDs
-        for (const store of Object.values(this.data.userStores)) {
-          if (store.conversations) {
-            if (store.conversations['undefined']) {
-              delete store.conversations['undefined'];
-            }
-            for (const [k, c] of Object.entries(store.conversations)) {
-              if (!c.id || c.id === 'undefined') {
-                c.id = k !== 'undefined' ? k : `conv_${c.createdAt || Date.now()}`;
+          this.data = {
+            users: parsed.users || {},
+            sessions: parsed.sessions || {},
+            userStores,
+            sharedChats: parsed.sharedChats || {},
+          };
+
+          // Sanitize any conversations with undefined or missing IDs
+          for (const store of Object.values(this.data.userStores)) {
+            if (store.conversations) {
+              if (store.conversations['undefined']) {
+                delete store.conversations['undefined'];
+              }
+              for (const [k, c] of Object.entries(store.conversations)) {
+                if (!c.id || c.id === 'undefined') {
+                  c.id = k !== 'undefined' ? k : `conv_${c.createdAt || Date.now()}`;
+                }
               }
             }
           }
