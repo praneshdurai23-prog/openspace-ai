@@ -1,0 +1,46 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="64" height="64" rx="16" fill="#080A12" />
+  <defs>
+    <linearGradient id="favOpenSpaceGrad" x1="14" y1="14" x2="50" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#7C3AED" />
+      <stop offset="50%" stopColor="#A855F7" />
+      <stop offset="100%" stopColor="#06B6D4" />
+    </linearGradient>
+    <radialGradient id="favCoreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stopColor="#06B6D4" stopOpacity="0.8" />
+      <stop offset="60%" stopColor="#7C3AED" stopOpacity="0.5" />
+      <stop offset="100%" stopColor="#7C3AED" stopOpacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Ambient Glow -->
+  <circle cx="32" cy="32" r="14" fill="url(#favCoreGlow)" />
+
+  <!-- Open Space Geometric Frame: 4 Cardinal Portals -->
+  <!-- Top-Left -->
+  <path d="M 15 25 L 15 18 C 15 16.34 16.34 15 18 15 L 25 15" stroke="url(#favOpenSpaceGrad)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Top-Right -->
+  <path d="M 39 15 L 46 15 C 47.66 15 49 16.34 49 18 L 49 25" stroke="url(#favOpenSpaceGrad)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Bottom-Right -->
+  <path d="M 49 39 L 49 46 C 49 47.66 47.66 49 46 49 L 39 49" stroke="url(#favOpenSpaceGrad)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Bottom-Left -->
+  <path d="M 25 49 L 18 49 C 16.34 49 15 47.66 15 46 L 15 39" stroke="url(#favOpenSpaceGrad)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Convergent Vectors -->
+  <line x1="21" y1="21" x2="25" y2="25" stroke="#7C3AED" stroke-width="2" stroke-linecap="round" opacity="0.8" />
+  <line x1="43" y1="21" x2="39" y2="25" stroke="#A855F7" stroke-width="2" stroke-linecap="round" opacity="0.8" />
+  <line x1="43" y1="43" x2="39" y2="39" stroke="#06B6D4" stroke-width="2" stroke-linecap="round" opacity="0.8" />
+  <line x1="21" y1="43" x2="25" y2="39" stroke="#06B6D4" stroke-width="2" stroke-linecap="round" opacity="0.8" />
+
+  <!-- Floating Intelligent Core Diamond -->
+  <polygon points="32,24.5 39.5,32 32,39.5 24.5,32" fill="#101321" stroke="url(#favOpenSpaceGrad)" stroke-width="2" stroke-linejoin="round" />
+
+  <!-- Central Intelligent Nucleus -->
+  <circle cx="32" cy="32" r="3.5" fill="#06B6D4" stroke="#F5F7FF" stroke-width="1.4" />
+
+  <!-- Cardinal Coordinates -->
+  <circle cx="32" cy="15" r="1.5" fill="#A855F7" />
+  <circle cx="49" cy="32" r="1.5" fill="#06B6D4" />
+  <circle cx="32" cy="49" r="1.5" fill="#06B6D4" />
+  <circle cx="15" cy="32" r="1.5" fill="#7C3AED" />
+</svg>

@@ -1,0 +1,340 @@
+{
+  "users": {
+    "usr_g_1788766495839_2794d97a": {
+      "id": "usr_g_1788766495839_2794d97a",
+      "email": "praneshdurai23@gmail.com",
+      "name": "Pranesh Durai",
+      "avatar": "https://api.dicebear.com/7.x/initials/svg?seed=Pranesh%20Durai",
+      "provider": "google",
+      "createdAt": 1788766495839,
+      "lastLoginAt": 1788766495839
+    }
+  },
+  "sessions": {
+    "c383b8b6226ee71cfe1b17ec65893fdf56f149181696562673b782e59304ba57": {
+      "token": "c383b8b6226ee71cfe1b17ec65893fdf56f149181696562673b782e59304ba57",
+      "userId": "usr_g_1788766495839_2794d97a",
+      "createdAt": 1788766495839,
+      "expiresAt": 1791358495839
+    }
+  },
+  "userStores": {
+    "guest": {
+      "conversations": {
+        "test-conv-stream": {
+          "id": "test-conv-stream",
+          "title": "Say hello in 5 words",
+          "mode": "normal",
+          "createdAt": 1788747010325,
+          "updatedAt": 1788747026839,
+          "messages": [
+            {
+              "id": "user_1788747010325",
+              "role": "user",
+              "content": "Say hello in 5 words",
+              "timestamp": 1788747010325,
+              "mode": "normal",
+              "attachments": []
+            },
+            {
+              "id": "asst_1788747010325",
+              "role": "assistant",
+              "content": "",
+              "timestamp": 1788747017418,
+              "mode": "normal"
+            },
+            {
+              "id": "user_1788747024528",
+              "role": "user",
+              "content": "Say hello in 5 words",
+              "timestamp": 1788747024528,
+              "mode": "normal",
+              "attachments": []
+            },
+            {
+              "id": "asst_1788747024528",
+              "role": "assistant",
+              "content": "",
+              "timestamp": 1788747026839,
+              "mode": "normal"
+            }
+          ]
+        },
+        "test-conv-stream-2": {
+          "id": "test-conv-stream-2",
+          "title": "Say hello in 5 words",
+          "mode": "normal",
+          "createdAt": 1788747060423,
+          "updatedAt": 1788747064906,
+          "messages": [
+            {
+              "id": "user_1788747060423",
+              "role": "user",
+              "content": "Say hello in 5 words",
+              "timestamp": 1788747060423,
+              "mode": "normal",
+              "attachments": []
+            },
+            {
+              "id": "asst_1788747060423",
+              "role": "assistant",
+              "content": "",
+              "timestamp": 1788747064906,
+              "mode": "normal"
+            }
+          ]
+        },
+        "test-conv-stream-3": {
+          "id": "test-conv-stream-3",
+          "title": "Say hello in 5 words",
+          "mode": "normal",
+          "createdAt": 1788747094212,
+          "updatedAt": 1788747096308,
+          "messages": [
+            {
+              "id": "user_1788747094212",
+              "role": "user",
+              "content": "Say hello in 5 words",
+              "timestamp": 1788747094212,
+              "mode": "normal",
+              "attachments": []
+            },
+            {
+              "id": "asst_1788747094213",
+              "role": "assistant",
+              "content": "Hello! Welcome to your workspace.",
+              "timestamp": 1788747096308,
+              "mode": "normal"
+            }
+          ]
+        },
+        "conv_1788766409008_test": {
+          "id": "conv_1788766409008_test",
+          "title": "Who created you?",
+          "mode": "normal",
+          "createdAt": 1788766409008,
+          "updatedAt": 1788766412094,
+          "messages": [
+            {
+              "id": "user_1788766409008",
+              "role": "user",
+              "content": "Who created you?",
+              "timestamp": 1788766409008,
+              "mode": "normal",
+              "attachments": []
+            },
+            {
+              "id": "asst_1788766409008",
+              "role": "assistant",
+              "content": "OpenSpace AI was created by Pranesh.",
+              "timestamp": 1788766409010,
+              "mode": "normal",
+              "webSearchUsed": false,
+              "searchQueries": [],
+              "groundingSources": []
+            },
+            {
+              "id": "user_1788766412093",
+              "role": "user",
+              "content": "Who created OpenSpace AI?",
+              "timestamp": 1788766412093,
+              "mode": "normal",
+              "attachments": []
+            },
+            {
+              "id": "asst_1788766412093",
+              "role": "assistant",
+              "content": "OpenSpace AI was created by Pranesh.",
+              "timestamp": 1788766412094,
+              "mode": "normal",
+              "webSearchUsed": false,
+              "searchQueries": [],
+              "groundingSources": []
+            }
+          ]
+        },
+        "conv_1788767244115_mllb4": {
+          "id": "conv_1788767244115_mllb4",
+          "title": "What is Python in 1 sentence?",
+          "mode": "normal",
+          "createdAt": 1788767244115,
+          "updatedAt": 1788767248065,
+          "messages": [
+            {
+              "id": "user_1788767244115",
+              "role": "user",
+              "content": "What is Python in 1 sentence?",
+              "timestamp": 1788767244115,
+              "mode": "normal",
+              "attachments": []
+            },
+            {
+              "id": "asst_1788767244115",
+              "role": "assistant",
+              "content": "Python is a beginner-friendly, versatile programming language known for its clear, readable syntax and widespread use in web development, data science, and artificial intelligence.",
+              "timestamp": 1788767248065,
+              "mode": "normal",
+              "webSearchUsed": false,
+              "searchQueries": [],
+              "groundingSources": []
+            }
+          ]
+        },
+        "conv_1788767756471_40c4z": {
+          "id": "conv_1788767756471_40c4z",
+          "title": "Hi, what is 2+2?",
+          "mode": "normal",
+          "createdAt": 1788767756471,
+          "updatedAt": 1788767757299,
+          "messages": [
+            {
+              "id": "user_1788767756471",
+              "role": "user",
+              "content": "Hi, what is 2+2?",
+              "timestamp": 1788767756471,
+              "mode": "normal",
+              "attachments": []
+            },
+            {
+              "id": "asst_1788767756470",
+              "role": "assistant",
+              "content": "Hello! I am OpenSpace, your AI. Your Space.\n\n2 + 2 = **4**.",
+              "timestamp": 1788767757299,
+              "mode": "normal",
+              "webSearchUsed": false,
+              "searchQueries": [],
+              "groundingSources": []
+            }
+          ]
+        },
+        "conv_1788767768025_9zdz2": {
+          "id": "conv_1788767768025_9zdz2",
+          "title": "Write a 2-line poem about stars",
+          "mode": "normal",
+          "createdAt": 1788767768025,
+          "updatedAt": 1788767768955,
+          "messages": [
+            {
+              "id": "user_1788767768025",
+              "role": "user",
+              "content": "Write a 2-line poem about stars",
+              "timestamp": 1788767768025,
+              "mode": "normal",
+              "attachments": []
+            },
+            {
+              "id": "asst_1788767768025",
+              "role": "assistant",
+              "content": "Silver lanterns hung in the velvet night,\nGuiding the darkness with ancient light.",
+              "timestamp": 1788767768955,
+              "mode": "normal",
+              "webSearchUsed": false,
+              "searchQueries": [],
+              "groundingSources": []
+            }
+          ]
+        }
+      },
+      "files": {},
+      "settings": {
+        "theme": "system",
+        "defaultMode": "normal",
+        "sendOnEnter": true,
+        "streamResponses": true,
+        "codeWrap": false,
+        "language": "english",
+        "responseLength": "balanced",
+        "responseStyle": "professional",
+        "fontSize": "medium",
+        "webSearchDefault": false,
+        "simpleExplanationDefault": false
+      },
+      "projects": {},
+      "memories": {}
+    },
+    "usr_g_1788766495839_2794d97a": {
+      "conversations": {
+        "conv_1788766571071_fh54o": {
+          "id": "conv_1788766571071_fh54o",
+          "title": "hi",
+          "mode": "normal",
+          "createdAt": 1788766572215,
+          "updatedAt": 1788766668265,
+          "messages": [
+            {
+              "id": "user_1788766571071",
+              "role": "user",
+              "content": "hi",
+              "timestamp": 1788766572254,
+              "mode": "normal",
+              "attachments": []
+            },
+            {
+              "id": "asst_1788766571072",
+              "role": "assistant",
+              "content": "Hello! Welcome to **OpenSpace**. \n\nHow can I assist you today? Feel free to ask a question, request a guide, or share a problem you'd like to solve.",
+              "timestamp": 1788766582056,
+              "mode": "normal",
+              "webSearchUsed": false,
+              "searchQueries": [],
+              "groundingSources": []
+            },
+            {
+              "id": "user_1788766595957",
+              "role": "user",
+              "content": "unna pati konjam sollu",
+              "timestamp": 1788766596610,
+              "mode": "normal",
+              "attachments": []
+            },
+            {
+              "id": "asst_1788766595958",
+              "role": "assistant",
+              "content": "வணக்கம்! நான் தான் **OpenSpace AI**. உங்களின் தனிப்பட்ட அறிவுசார் உதவியாளர் (Personal Intelligence Workspace).\n\nஎன்னைப்பற்றிச் சுருக்கமாகச் சொல்கிறேன்:\n\n*   **யார் என்னை உருவாக்கினார்கள்?**: OpenSpace AI-ஐ உருவாக்கியவர் **Pranesh**.\n*   **என் நோக்கம்**: உங்களின் அன்றாடப் பணிகளை எளிதாக்குவது, சிக்கலான விஷயங்களை மிக எளிமையாக விளக்குவது மற்றும் உங்களின் சிந்தனைகளை ஒருங்கமைக்க உதவுவது.\n*   **எனது சிறப்பம்சம்**: எனது 'Simple Step-by-Step Explanation Engine' மூலம், கடினமான விஷயங்களைக் கூட மிகத் தெளிவாக, படிப் படியாக (Step-by-Step) உங்களுக்குப் புரியவைப்பேன்.\n*   **எனது தாரக மந்திரம்**: \"Your AI. Your Space.\"\n\nஉங்களுக்கு ஏதேனும் உதவி தேவைப்பட்டாலோ அல்லது ஏதாவது கற்றுக்கொள்ள விரும்பினாலோ, தயங்காமல் கேளுங்கள். நான் உங்களுக்கு உதவத் தயாராக இருக்கிறேன்!\n\nஉங்களுக்கு இன்று நான் எப்படி உதவட்டும்?",
+              "timestamp": 1788766631294,
+              "mode": "normal",
+              "webSearchUsed": false,
+              "searchQueries": [],
+              "groundingSources": []
+            },
+            {
+              "id": "user_1788766654169",
+              "role": "user",
+              "content": "thanglish la sollu",
+              "timestamp": 1788766655239,
+              "mode": "normal",
+              "attachments": []
+            },
+            {
+              "id": "asst_1788766654170",
+              "role": "assistant",
+              "content": "Kandippa! Enna pathi simple-ah Tanglish-la solren:\n\nNaan thaan **OpenSpace AI**, ungaloda personal intelligence workspace matrum assistant. \n\nEnna pathina mukkiyamana vishayangal:\n\n* **Enna create pannadhu yaar?**: OpenSpace AI-ah create pannadhu **Pranesh**.\n* **En tagline**: *\"Your AI. Your Space.\"*\n* **Naan enna pannuven?**: Ungalukku puriyadha vishayangala romba simple-ah, Step-by-Step-ah puriya veppen. Adhu coding-aa irukattum, study topics-aa irukattum, illa unga daily work related doubts-aa kooda irukattum.\n* **Special feature**: Enkitta irukra 'Simple Step-by-Step Explanation Engine' moolama, evvalavu periya vishayathaiyum easy steps-la breakdown panni ungalukku solli tharuven.\n\nUngalukku ippo edhavadhu topic puriyanuma, illa edhavadhu problem solve pannanuma? Sollunga, start pannalam!",
+              "timestamp": 1788766668265,
+              "mode": "normal",
+              "webSearchUsed": false,
+              "searchQueries": [],
+              "groundingSources": []
+            }
+          ]
+        }
+      },
+      "files": {},
+      "settings": {
+        "theme": "dark",
+        "defaultMode": "normal",
+        "sendOnEnter": true,
+        "streamResponses": true,
+        "codeWrap": false,
+        "language": "english",
+        "responseLength": "balanced",
+        "responseStyle": "professional",
+        "fontSize": "medium",
+        "webSearchDefault": false,
+        "simpleExplanationDefault": false
+      },
+      "projects": {},
+      "memories": {}
+    }
+  },
+  "sharedChats": {}
+}

@@ -1,0 +1,6 @@
+{
+  "name": "OpenSpace AI",
+  "description": "Your AI. Your Space. A modern AI assistant powered by Gemini.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

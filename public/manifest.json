@@ -1,0 +1,16 @@
+{
+  "name": "OpenSpace AI",
+  "short_name": "OpenSpace",
+  "description": "Your AI. Your Space. A modern AI assistant powered by Gemini.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080A12",
+  "theme_color": "#080A12",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
