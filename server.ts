@@ -11,27 +11,15 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-// Normalize URL paths for both standalone and Vercel serverless environments
-app.use((req: Request, _res: Response, next: NextFunction) => {
-  // If request was rewritten to /api/index or /api/index.js, restore the original requested path
-  const original = req.originalUrl || (req.headers['x-matched-path'] as string);
-  if (original && original.startsWith('/api') && (req.url === '/api/index' || req.url === '/api/index.js' || req.url === '/index.js' || req.url === '/index')) {
-    req.url = original;
-  } else if (req.url && !req.url.startsWith('/api')) {
-    req.url = `/api${req.url.startsWith('/') ? '' : '/'}${req.url}`;
-  }
-  next();
-});
-
-// Root API discovery endpoint
-app.get('/api', (_req: Request, res: Response) => {
-  res.json({
-    status: 'ok',
-    name: 'OpenSpace AI API',
-    version: '1.0.0',
-    timestamp: Date.now(),
+// Normalize URL paths if routed to serverless function without /api prefix
+if (process.env.VERCEL) {
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    if (req.url && !req.url.startsWith('/api')) {
+      req.url = `/api${req.url.startsWith('/') ? '' : '/'}${req.url}`;
+    }
+    next();
   });
-});
+}
 
 // Body parsers with generous limits for inline file attachments (up to 25MB)
 app.use(express.json({ limit: '25mb' }));
@@ -845,15 +833,8 @@ async function startServer() {
   });
 }
 
-// Only start standalone HTTP server when not running in a serverless environment
-const isServerless = Boolean(
-  process.env.VERCEL ||
-  process.env.VERCEL_ENV ||
-  process.env.NOW_REGION ||
-  process.env.AWS_LAMBDA_FUNCTION_NAME
-);
-
-if (!isServerless) {
+// Only start standalone HTTP server when not running in Vercel serverless environment
+if (!process.env.VERCEL) {
   startServer();
 }
 

@@ -341,7 +341,13 @@ export async function apiExportUserData(): Promise<Blob> {
   }
 
   if (!res.ok) {
-    await safeParseResponse(res, 'Failed to export user data');
+    let errMsg = 'Failed to export user data';
+    try {
+      const text = await res.text();
+      const parsed = JSON.parse(text);
+      if (parsed?.error) errMsg = parsed.error;
+    } catch {}
+    throw new Error(errMsg);
   }
   return res.blob();
 }
@@ -878,18 +884,12 @@ export async function streamChat(params: StreamChatParams): Promise<void> {
   const contentType = (response.headers.get('content-type') || '').toLowerCase();
   if (!contentType.includes('text/event-stream')) {
     try {
-      const rawText = (await response.text()).trim();
-      let errMsg = 'The server did not return a streaming response.';
-      if (rawText.startsWith('<') || rawText.toLowerCase().includes('<!doctype')) {
-        errMsg = 'The AI streaming service is currently unreachable (received HTML response).';
-      } else if (rawText.startsWith('{') && rawText.endsWith('}')) {
-        try {
-          const parsed = JSON.parse(rawText);
-          if (parsed?.error) errMsg = parsed.error;
-        } catch {}
-      } else if (rawText.length < 150) {
-        errMsg = rawText;
-      }
+      const rawText = await response.text();
+      let errMsg = 'The server did not return a valid stream.';
+      try {
+        const parsed = JSON.parse(rawText.trim());
+        if (parsed?.error) errMsg = parsed.error;
+      } catch {}
       params.onError(errMsg);
     } catch {
       params.onError('Unexpected response format from streaming endpoint.');
